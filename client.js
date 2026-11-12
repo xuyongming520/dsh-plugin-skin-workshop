@@ -824,10 +824,11 @@ const WORKSHOP_CSS = `
 .sw-field output{font-size:11px;color:var(--sw-ui-muted);font-variant-numeric:tabular-nums}
 .sw-field:has(input:disabled){opacity:.5}
 .sw-control-stack{display:grid;gap:15px}
-.sw-bg-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.sw-bg-option{min-width:0;border:1px solid var(--sw-ui-line);border-radius:8px;padding:3px;background:transparent;color:var(--sw-ui-muted);font-size:9px!important;line-height:16px;text-align:center;overflow:hidden}
-.sw-bg-option span{display:block;height:34px;border-radius:5px;background-size:cover;background-position:center}
-.sw-bg-option[aria-pressed=true]{border-color:var(--sw-ui-accent);color:var(--sw-ui-accent)}
+.sw-bg-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:6px}
+.sw-bg-option{display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid var(--sw-ui-line);border-radius:10px;padding:5px;background:var(--sw-ui-card);color:var(--sw-ui-muted);font-size:11px!important;line-height:16px;text-align:center;overflow:hidden;transition:border-color .16s,transform .16s}
+.sw-bg-option span{display:block;height:56px;border-radius:7px;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px #00000010}
+.sw-bg-option:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--sw-ui-accent) 45%,var(--sw-ui-line))}
+.sw-bg-option[aria-pressed=true]{border-color:var(--sw-ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--sw-ui-accent) 12%,transparent);color:var(--sw-ui-ink)}
 .sw-upload{width:100%;padding:12px 8px;border:1px dashed color-mix(in srgb,var(--sw-ui-accent) 45%,var(--sw-ui-line));border-radius:10px;background:color-mix(in srgb,var(--sw-ui-accent) 3%,var(--sw-ui-card));color:var(--sw-ui-accent);font-size:12px!important;display:flex;flex-direction:column;gap:3px;align-items:center}
 .sw-upload small{font-size:9px;color:var(--sw-ui-muted)}
 .sw-details{border-top:1px solid var(--sw-ui-line);padding-top:12px}
@@ -879,6 +880,8 @@ body[data-ds-dark-theme] .sw-livebar small{color:#ffacb3}
 .sw-savebar-primary{margin-left:auto}
 .sw-name-field{max-width:340px;margin:0}
 .sw-bgcard--active{border-color:var(--sw-ui-accent);background:color-mix(in srgb,var(--sw-ui-accent) 6%,var(--sw-ui-card))}
+.sw-applied{font-size:12px;color:var(--sw-ui-muted)}
+.sw-notice{display:flex;align-items:center;gap:10px;justify-content:space-between}
 `
 
 
@@ -962,6 +965,9 @@ function createWorkshopUI(React, store, openWorkbench) {
     const [editorTab, setEditorTab] = React.useState(initial.editorTab ?? 'skin')
     const [dragging, setDragging] = React.useState(false)
     const [justUploaded, setJustUploaded] = React.useState(false)
+    const [undoSnapshot, setUndoSnapshot] = React.useState(null)
+    // True when the draft holds edits the user has not applied yet.
+    const [pending, setPending] = React.useState(false)
     const [message, setMessage] = React.useState('')
     const [error, setError] = React.useState('')
     const [busy, setBusy] = React.useState('')
@@ -988,11 +994,11 @@ function createWorkshopUI(React, store, openWorkbench) {
       return () => { mounted.current = false; operation.current++ }
     }, [])
     React.useEffect(() => {
-      if (!dirty) return undefined
+      if (!pending) return undefined
       const warn = (event) => { event.preventDefault(); event.returnValue = '' }
       window.addEventListener('beforeunload', warn)
       return () => window.removeEventListener('beforeunload', warn)
-    }, [dirty])
+    }, [pending])
     React.useEffect(() => {
       // The persistent preview bar can save while this page is mounted.
       if (!state.preview && state.active && sameSkin(state.active.skin, draft)) {
@@ -1006,6 +1012,7 @@ function createWorkshopUI(React, store, openWorkbench) {
       try { action() } catch (failure) { setError(failure?.message ?? '操作失败，请再试一次。') }
     }
     const edit = (change) => {
+      setPending(true)
       setDraft((previous) => typeof change === 'function' ? change(previous) : { ...previous, ...change })
       setError('')
       setMessage('')
@@ -1016,12 +1023,13 @@ function createWorkshopUI(React, store, openWorkbench) {
       try { store.updatePreview(previewDraft) } catch (failure) { setError(failure.message) }
     }, [previewDraft])
     const editWallpaper = (change) => edit((previous) => ({ ...previous, wallpaper: { ...previous.wallpaper, ...change } }))
-    const replaceDraft = (skin, id = null, note = '') => {
+    const replaceDraft = (skin, id = null, note = '', { pending: skipBaseline = false } = {}) => {
+      setPending(true)
       operation.current++
       setBusy('')
       store.cancelPreview()
       setDraft(cloneSkin(skin))
-      setBaseline(cloneSkin(skin))
+      if (!skipBaseline) setBaseline(cloneSkin(skin))
       setSelectedId(id)
       setError('')
       setMessage(note)
@@ -1030,10 +1038,10 @@ function createWorkshopUI(React, store, openWorkbench) {
       if (dirtyRef.current) setConfirm({ text: '当前还有未保存的修改。继续载入整套搭配会放弃这些修改。', label: '放弃并切换', action })
       else action()
     }
-    const switchTemplate = (template) => edit((previous) => ({
-      ...changeTemplate({ ...previous, name: previous.name.trim() || '未命名皮肤' }, template),
-      name: previous.name,
-    }))
+    const switchTemplate = (template) => {
+      const next = changeTemplate({ ...draft, name: draft.name.trim() || '未命名皮肤' }, template)
+      applyNow({ ...next, name: draft.name }, `已切换到「${TEMPLATE_INFO[template].title}」。`)
+    }
     const save = (apply = false, copy = false) => run(() => {
       const next = validateSkin(copy ? { ...draft, name: `${draft.name.trim().slice(0, 35)} 副本` } : draft)
       const id = store.save(next, { id: selectedId, apply, copy })
@@ -1041,7 +1049,48 @@ function createWorkshopUI(React, store, openWorkbench) {
       setSelectedId(id)
       setDraft(cloneSkin(next))
       setBaseline(cloneSkin(next))
+      if (apply) setPending(false)
       setMessage(apply ? '已保存并应用。下次打开仍会使用这款皮肤。' : '已保存到我的皮肤，当前外观没有改变。')
+    })
+    // A picked wallpaper or theme is a finished choice, not a draft: apply it at
+    // once and offer one-step undo, so nobody has to look for a Save button.
+    const applyNow = (skin, note) => run(() => {
+      // An applied choice ends any running preview; otherwise the timed bar
+      // would outlive the skin it was previewing.
+      store.cancelPreview()
+      // Applying needs a name; fall back to the theme title instead of refusing
+      // the change just because the name field is empty.
+      const next = validateSkin({ ...skin, name: (skin.name ?? '').trim() || TEMPLATE_INFO[skin.template].title })
+      const previous = state.active ? cloneSkin(state.active) : null
+      const id = store.save(next, { id: selectedId, apply: true })
+      setSelectedId(id)
+      setDraft(cloneSkin(next))
+      setBaseline(cloneSkin(next))
+      setUndoSnapshot(previous)
+      setPending(false)
+      setError('')
+      setMessage(note)
+    })
+    const liveTimer = React.useRef(null)
+    const applySoon = (skin) => {
+      setDraft((d) => skin)
+      if (liveTimer.current) clearTimeout(liveTimer.current)
+      liveTimer.current = setTimeout(() => { liveTimer.current = null; applyNow(skin, '') }, 300)
+    }
+    React.useEffect(() => () => { if (liveTimer.current) clearTimeout(liveTimer.current) }, [])
+    const undoApplied = () => run(() => {
+      if (undoSnapshot) {
+        store.save(cloneSkin(undoSnapshot.skin), { id: undoSnapshot.id, apply: true })
+        setSelectedId(undoSnapshot.id)
+        setDraft(cloneSkin(undoSnapshot.skin))
+        setBaseline(cloneSkin(undoSnapshot.skin))
+      } else {
+        store.restoreDefault()
+        setDraft(makeCombination())
+        setBaseline(makeCombination())
+      }
+      setUndoSnapshot(null)
+      setMessage('已撤销这次更换。')
     })
     const remove = () => setConfirm({
       text: state.active?.id === selectedId ? '删除这款皮肤后会恢复 DSH 默认外观。要继续吗？' : '要从本机删除这款皮肤吗？建议先导出备份。',
@@ -1056,7 +1105,7 @@ function createWorkshopUI(React, store, openWorkbench) {
       try {
         const skin = await readSkinFile(file)
         if (!mounted.current || token !== operation.current) return
-        requestReplace(() => replaceDraft(skin, null, '已导入到编辑器，尚未应用。可继续修改，或保存并应用。'))
+        requestReplace(() => replaceDraft(skin, null, '已导入到编辑器，尚未应用。确认无误后点「保存并应用」。', { pending: true }))
       } catch (failure) {
         if (mounted.current && token === operation.current) setError(failure.message)
       } finally {
@@ -1071,9 +1120,8 @@ function createWorkshopUI(React, store, openWorkbench) {
       try {
         const image = await readWallpaperFile(file)
         if (!mounted.current || token !== operation.current) return
-        editWallpaper({ kind: 'image', image })
         setJustUploaded(true)
-        setMessage('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。')
+        applyNow({ ...draft, wallpaper: { ...draft.wallpaper, kind: 'image', image } }, '壁纸已应用。想恢复原样，点下面「撤销」。')
       } catch (failure) {
         if (mounted.current && token === operation.current) setError(failure.message)
       } finally {
@@ -1122,7 +1170,7 @@ function createWorkshopUI(React, store, openWorkbench) {
           onClick: () => setEditorTab(id), onKeyDown: tabKey,
         }, h('span', { className: 'sw-tab-title' }, title), h('span', { className: 'sw-tab-hint' }, hint)))),
         h('section', panelProps('skin'),
-          h('p', { className: 'sw-panel-lead' }, '上传一张图就能看到效果。其余参数都收在「高级」里，需要时再展开。'),
+          h('p', { className: 'sw-panel-lead' }, '挑一张喜欢的图，工作台立刻换个心情。'),
           noBackground ? h('button', {
             type: 'button', className: `sw-dropzone${dragging ? ' sw-dropzone--active' : ''}`, disabled: !!busy,
             onClick: () => imageInput.current?.click(),
@@ -1162,14 +1210,14 @@ function createWorkshopUI(React, store, openWorkbench) {
                 h(Button, { tone: 'ghost', onClick: () => { operation.current++; setBusy(''); setJustUploaded(false); editWallpaper({ kind: 'none', image: '' }) } }, '移除背景')))),
           h('div', { className: 'sw-bg-options', role: 'group', 'aria-label': '内置背景' }, Object.entries(BACKGROUND_INFO).map(([key, text]) => h('button', {
             key, type: 'button', className: 'sw-bg-option', 'aria-pressed': draft.wallpaper.kind === 'preset' && draft.wallpaper.preset === key,
-            onClick: () => { operation.current++; setBusy(''); setJustUploaded(false); editWallpaper({ kind: 'preset', preset: key, image: '' }); setEditorTab('skin') },
+            onClick: () => { operation.current++; setBusy(''); setJustUploaded(false); setEditorTab('skin'); applyNow({ ...draft, wallpaper: { ...draft.wallpaper, kind: 'preset', preset: key, image: '' } }, `已换成内置背景「${text}」。`) },
           }, h('span', { style: { backgroundImage: PRESET_BACKGROUNDS[key] } }), text))),
           h('div', { className: 'sw-reading-control sw-reading-control--top' }, h('span', { className: 'sw-reading-icon', 'aria-hidden': true }, 'Aa'),
-            h(Slider, { label: '正文阅读遮罩', value: draft.readingOpacity, unit: '%', onChange: (readingOpacity) => edit({ readingOpacity }) }),
+            h(Slider, { label: '正文阅读遮罩', value: draft.readingOpacity, unit: '%', onChange: (readingOpacity) => applySoon({ ...draft, readingOpacity }) }),
             h('p', { className: 'sw-hint' }, `壁纸在正文里还剩「${100 - draft.readingOpacity}% 可见」。30–45% 壁纸清楚、字也能读；越高越像普通工作台。`)),
           h('div', { className: 'sw-actions sw-quick-opacity' }, h('span', { className: 'sw-subtle' }, '一键调节'),
-            h(Button, { onClick: () => edit({ material: 'glass', opacity: 40, readingOpacity: 30 }) }, '更通透'),
-            h(Button, { onClick: () => edit({ opacity: 80, readingOpacity: 80 }) }, '更清晰')),
+            h(Button, { onClick: () => applyNow({ ...draft, material: 'glass', opacity: 40, readingOpacity: 30 }, '已切到更通透的观感。') }, '更通透'),
+            h(Button, { onClick: () => applyNow({ ...draft, opacity: 80, readingOpacity: 80 }, '已切到更清晰的观感。') }, '更清晰')),
           draft.wallpaper.kind !== 'none' && draft.readingOpacity < 30 ? h('p', { className: 'sw-hint sw-hint--warn', role: 'status' }, '正文遮罩低于 30%，壁纸很显眼，但复杂图片上的小字可能发花。看不清就点「更清晰」，或把遮罩调回 40% 左右。') : null,
           h('details', { className: 'sw-details sw-advanced' }, h('summary', null, '高级：壁纸与面板'),
             h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '壁纸细节'), h('p', null, '只影响图片本身，不动主题。')),
@@ -1207,9 +1255,9 @@ function createWorkshopUI(React, store, openWorkbench) {
           h('button', {
             type: 'button', className: 'sw-theme-kit', 'data-theme-kit': id,
             'aria-label': `套用${info.title}的配套皮肤`,
-            onClick: () => requestReplace(() => replaceDraft(
-              makeCombination(THEME_COMBINATION[id]), null,
-              `已载入「${COMBINATION_INFO[THEME_COMBINATION[id]].title}」配套：主题、背景与材质一起换上。`,
+            onClick: () => requestReplace(() => applyNow(
+              makeCombination(THEME_COMBINATION[id]),
+              `已应用「${COMBINATION_INFO[THEME_COMBINATION[id]].title}」配套：主题、背景与材质一起换上。`,
             )),
           }, '套用配套')))),
           h('p', { className: 'sw-hint' }, nativeStyle ? '原生风格不会覆盖宿主的配色与圆角；适合保留当前主题，只换背景。' : '强调色与明暗模式继续跟随 DSH，不会改动字体、导航位置或按钮功能。'),
@@ -1231,7 +1279,7 @@ function createWorkshopUI(React, store, openWorkbench) {
           h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '快速搭配'), h('p', null, '不想逐项调时载入一整套，再拆开改。')),
           h('div', { className: 'sw-templates' }, combinations.map(({ id, skin }) => h(SkinCard, {
             key: id, skin, dark, combination: id, selected: !selectedSaved && sameSkin(draft, skin),
-            onClick: () => requestReplace(() => replaceDraft(skin)),
+            onClick: () => requestReplace(() => applyNow(skin, `已应用「${COMBINATION_INFO[id].title}」，整窗立刻生效。`)),
           }))),
           h('p', { className: 'sw-note' }, '仅保存在当前浏览器 / 设备。「导出分享包」包含整套参数与上传的壁纸，可发给同样安装了皮肤工坊的人。')),
         h('div', { className: 'sw-savebar' },
@@ -1246,8 +1294,12 @@ function createWorkshopUI(React, store, openWorkbench) {
                 selectedSaved ? h(Button, { tone: 'danger', onClick: remove }, '删除') : null)),
             h('div', { className: 'sw-actions sw-savebar-primary' },
               h(Button, { disabled: !!busy, onClick: () => run(() => { store.previewSkin(previewDraft, selectedId); setMessage('试穿不会保存，离开工坊也可通过右下角浮条撤销；60 秒后自动恢复。') }) }, `试穿 ${PREVIEW_SECONDS} 秒`),
-              h(Button, { tone: 'primary', disabled: !!busy, onClick: () => save(true) }, '保存并应用')))),
-        message ? h('div', { className: 'sw-notice', role: 'status' }, message) : null,
+              pending
+                ? h(Button, { tone: 'primary', disabled: !!busy, onClick: () => save(true) }, '保存并应用')
+                : state.active ? h('span', { className: 'sw-applied', 'data-applied': true }, '已应用') : null))),
+        message ? h('div', { className: 'sw-notice', role: 'status' },
+          h('span', null, message),
+          undoSnapshot ? h(Button, { tone: 'ghost', onClick: undoApplied }, '撤销') : null) : null,
         h('div', { className: 'sw-recipe', 'aria-label': '当前搭配' },
           h('span', null, h('small', null, '主题'), h('strong', { 'data-recipe-theme': true }, TEMPLATE_INFO[draft.template].title)),
           h('i', { 'aria-hidden': true }, '＋'),

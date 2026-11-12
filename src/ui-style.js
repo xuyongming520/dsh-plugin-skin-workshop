@@ -158,10 +158,11 @@ export const WORKSHOP_CSS = `
 .sw-field output{font-size:11px;color:var(--sw-ui-muted);font-variant-numeric:tabular-nums}
 .sw-field:has(input:disabled){opacity:.5}
 .sw-control-stack{display:grid;gap:15px}
-.sw-bg-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.sw-bg-option{min-width:0;border:1px solid var(--sw-ui-line);border-radius:8px;padding:3px;background:transparent;color:var(--sw-ui-muted);font-size:9px!important;line-height:16px;text-align:center;overflow:hidden}
-.sw-bg-option span{display:block;height:34px;border-radius:5px;background-size:cover;background-position:center}
-.sw-bg-option[aria-pressed=true]{border-color:var(--sw-ui-accent);color:var(--sw-ui-accent)}
+.sw-bg-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:6px}
+.sw-bg-option{display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid var(--sw-ui-line);border-radius:10px;padding:5px;background:var(--sw-ui-card);color:var(--sw-ui-muted);font-size:11px!important;line-height:16px;text-align:center;overflow:hidden;transition:border-color .16s,transform .16s}
+.sw-bg-option span{display:block;height:56px;border-radius:7px;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px #00000010}
+.sw-bg-option:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--sw-ui-accent) 45%,var(--sw-ui-line))}
+.sw-bg-option[aria-pressed=true]{border-color:var(--sw-ui-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--sw-ui-accent) 12%,transparent);color:var(--sw-ui-ink)}
 .sw-upload{width:100%;padding:12px 8px;border:1px dashed color-mix(in srgb,var(--sw-ui-accent) 45%,var(--sw-ui-line));border-radius:10px;background:color-mix(in srgb,var(--sw-ui-accent) 3%,var(--sw-ui-card));color:var(--sw-ui-accent);font-size:12px!important;display:flex;flex-direction:column;gap:3px;align-items:center}
 .sw-upload small{font-size:9px;color:var(--sw-ui-muted)}
 .sw-details{border-top:1px solid var(--sw-ui-line);padding-top:12px}
@@ -213,4 +214,6 @@ body[data-ds-dark-theme] .sw-livebar small{color:#ffacb3}
 .sw-savebar-primary{margin-left:auto}
 .sw-name-field{max-width:340px;margin:0}
 .sw-bgcard--active{border-color:var(--sw-ui-accent);background:color-mix(in srgb,var(--sw-ui-accent) 6%,var(--sw-ui-card))}
+.sw-applied{font-size:12px;color:var(--sw-ui-muted)}
+.sw-notice{display:flex;align-items:center;gap:10px;justify-content:space-between}
 `

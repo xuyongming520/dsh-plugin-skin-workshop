@@ -38,6 +38,7 @@ const browser = await chromium.launch({ headless: true })
 const artifacts = process.env.DSH_TEST_ARTIFACT_DIR
 if (artifacts) await mkdir(artifacts, { recursive: true })
 const openTab = async (name) => { await page.getByRole('tab', { name: new RegExp('^' + name) }).click() }
+const applyIfNeeded = async () => { const b = page.getByRole('button', { name: '保存并应用', exact: true }); if (await b.count()) await b.click() }
 const openAdvanced = async () => { const s = page.locator('.sw-advanced>summary'); if (await s.count() && !(await page.locator('.sw-advanced').evaluate((el) => el.open))) await s.click() }
 const failures = [], errors = [], external = [], observations = []
 let passed = 0, page
@@ -88,6 +89,8 @@ try {
   await page.getByRole('button',{name:'原生示例聊天',exact:true}).click()
   const nativeComposer=await page.locator('[data-composer-card]').evaluate(el=>({radius:getComputedStyle(el).borderRadius,border:getComputedStyle(el).borderWidth,shadow:getComputedStyle(el).boxShadow,buttonRadius:getComputedStyle(el.querySelector('button')).borderRadius}))
   await page.getByRole('button',{name:'皮肤工坊',exact:true}).click()
+  // The primary button only shows while the draft differs from the applied skin.
+  await page.getByLabel('皮肤名称',{exact:true}).fill('原生外观')
   for(const dark of [false,true]){
     await page.evaluate(dark=>window.__setDark(dark),dark)
     const primary=page.getByRole('button',{name:'保存并应用',exact:true}),colors=await actionContrast(primary)
@@ -113,7 +116,7 @@ try {
     const before=await page.locator('.fixture-fixed-probe').boundingBox()
     const toggleBefore=await page.getByRole('button',{name:'原生折叠侧栏'}).boundingBox()
     await page.getByRole('button',{name:'皮肤工坊',exact:true}).click()
-    await page.getByRole('button',{name:'保存并应用',exact:true}).click()
+    await page.getByRole('button',{name:'更清晰',exact:true}).click()
     await page.getByRole('button',{name:'原生插件页',exact:true}).click()
     const after=await page.locator('.fixture-fixed-probe').boundingBox()
     const toggleAfter=await page.getByRole('button',{name:'原生折叠侧栏'}).boundingBox()
@@ -133,7 +136,7 @@ try {
     const names={xp:'XP 复古',pixel:'像素方块',glass:'简约玻璃'}
     await openTab('我的皮肤')
     await page.getByRole('button',{name:'使用搭配：'+names[template],exact:true}).click()
-    await page.getByRole('button',{name:'保存并应用',exact:true}).click()
+    await page.getByRole('button',{name:'放弃并切换',exact:true}).click({timeout:1500}).catch(()=>{})
     const actual=await page.locator('.kB3qhq_newSession').evaluate(el=>getComputedStyle(el).borderRadius)
     const navigation=await page.getByRole('button',{name:'皮肤工坊',exact:true}).evaluate(el=>getComputedStyle(el).backgroundImage)
     check(`${template}: native New Session uses template controls without replacing navigation`,actual===radius&&(template!=='xp'||navigation!=='none'),JSON.stringify({actual,navigation}))
@@ -157,14 +160,14 @@ try {
     for(const [x,y,r,color]of [[210,460,240,'#39217d'],[1100,320,220,'#d05489'],[1400,980,330,'#246c8e']]){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
     return canvas.toDataURL('image/png').split(',')[1]
   })
+  await openTab('换皮肤')
   await page.locator('input[aria-label="上传壁纸文件"]').setInputFiles({name:'generated-test-wallpaper.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')})
-  await page.getByText('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。',{exact:true}).waitFor()
-    await openTab('换皮肤')
+  await page.locator('[data-bg-preview="image"]').waitFor()
   await openAdvanced()
   await page.getByLabel('面板不透明度',{exact:true}).press('Home')
   for(let step=0;step<65;step++)await page.getByLabel('面板不透明度',{exact:true}).press('ArrowRight')
   await page.getByLabel('皮肤名称',{exact:true}).fill('原生界面回归 · 自制壁纸')
-  await page.getByRole('button',{name:'保存并应用',exact:true}).click()
+  await applyIfNeeded()
   await page.getByRole('button',{name:'原生插件页',exact:true}).click()
   await page.locator('.w6M7KW_page').waitFor()
   const headerBefore=await page.locator('[data-natural]').evaluate(el=>getComputedStyle(el,'::before').backgroundColor)
@@ -202,7 +205,7 @@ try {
   }
   await page.getByRole('button',{name:'皮肤工坊',exact:true}).click()
     await page.getByRole('button',{name:'更清晰',exact:true}).click()
-  await page.getByRole('button',{name:'保存并应用',exact:true}).click()
+  await applyIfNeeded()
   await page.getByRole('button',{name:'原生插件页',exact:true}).click()
   await page.locator('.w6M7KW_page').waitFor()
   for(const [dark,color] of extreme){
@@ -257,7 +260,7 @@ try {
 
   // Verify data-independent imported packs still work in the native fixture.
   await page.locator('input[aria-label="导入分享包文件"]').setInputFiles({name:'legacy.dsh-skin.json',mimeType:'application/json',buffer:Buffer.from(legacyXP)})
-  await page.getByText('已导入到编辑器，尚未应用。可继续修改，或保存并应用。',{exact:true}).waitFor()
+  await page.getByText('已导入到编辑器，尚未应用。确认无误后点「保存并应用」。',{exact:true}).waitFor()
   check('Existing version-1 packs import without a migration or automatic application',await page.locator('body').getAttribute('data-sw-template')==='glass')
   await page.getByRole('button',{name:'恢复默认',exact:true}).click()
   await page.getByRole('button',{name:'原生插件页',exact:true}).click()
@@ -272,7 +275,9 @@ try {
   check('An actual persisted v1 library starts correctly and is not rewritten during adoption',await page.locator('body').getAttribute('data-sw-template')==='glass'&&await page.evaluate(key=>localStorage.getItem(key),STORAGE_KEY)===oldLibrary)
   await openAdvanced()
   check('Adopted v1 library retains fractional panel/reading opacity without slider snapping',await page.getByLabel('面板不透明度',{exact:true}).inputValue()==='84.5'&&await page.getByLabel('正文阅读遮罩',{exact:true}).inputValue()==='84.5'&&await page.getByLabel('壁纸不透明度',{exact:true}).inputValue()==='100')
-  await page.getByRole('button',{name:'保存并应用',exact:true}).click()
+  // A save is explicit: it needs a pending change first.
+  await page.getByLabel('皮肤名称',{exact:true}).fill('旧皮肤升级')
+  await applyIfNeeded()
   const upgraded=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY)
   check('Only an explicit save upgrades the library while keeping the saved and active ids',upgraded.version===2&&upgraded.skins.length===1&&upgraded.skins[0].id==='skin-legacy'&&upgraded.active.id==='skin-legacy')
   await page.evaluate(()=>window.__disposePlugin())
