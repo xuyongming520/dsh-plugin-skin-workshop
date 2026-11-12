@@ -77,12 +77,14 @@ export function createWorkshopStore(storage, renderer, options = {}) {
       publish()
     }
   }
-  function save(skin, { id = null, copy = false, apply = false } = {}) {
+  function save(skin, { id = null, copy = false, apply = false, reuseId = false } = {}) {
     if (disposed) throw new Error('皮肤工坊已关闭，请刷新后再试。')
     const validated = validateSkin(skin)
     const exists = !copy && library.skins.some((entry) => entry.id === id)
     if (!exists && library.skins.length >= MAX_SKINS) throw new Error(`第一版最多保存 ${MAX_SKINS} 款皮肤。请先导出并删除不常用的皮肤。`)
-    const key = exists ? id : newSkinId()
+    // reuseId lets a caller own one stable slot (the live appearance) instead of
+    // creating a new entry on every change.
+    const key = exists ? id : (reuseId && id ? id : newSkinId())
     const entry = { id: key, skin: validated }
     const skins = exists ? library.skins.map((item) => item.id === key ? entry : item) : [...library.skins, entry]
     write({ ...library, skins, active: apply ? cloneSkin(entry) : library.active })

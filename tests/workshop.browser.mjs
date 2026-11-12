@@ -88,7 +88,6 @@ const openMore = async () => {
 }
 const readDraft = async () => {
   const event = page.waitForEvent('download')
-  await openMore()
   await page.getByRole('button', { name: '导出分享包', exact: true }).click()
   return JSON.parse(await readFile(await (await event).path(), 'utf8'))
 }
@@ -148,7 +147,7 @@ try {
   await page.getByLabel('皮肤名称', { exact: true }).fill('我的复古皮肤')
   pass('A starter kit reaches the shell and composer at once; a rename stays a draft edit')
 
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   assert.equal(await page.locator('.sw-saved .sw-card').count(), 1)
   assert.equal(await page.evaluate(() => window.__themeLayers.size), 1)
   await page.reload()
@@ -163,10 +162,10 @@ try {
   // Choosing a theme is a finished choice: it applies at once, no Save step.
   await selectStyle('pixel')
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
+  // There is no "apply" step any more; the block below is only about keeping and sharing.
   assert.equal(await page.getByRole('button', { name: '保存并应用', exact: true }).count(), 0)
-  // Typing a name only edits the draft, so the Save button comes back.
+  assert.equal(await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).isVisible(), true)
   await page.getByLabel('皮肤名称', { exact: true }).fill('像素工作室')
-  assert.equal(await page.getByRole('button', { name: '保存并应用', exact: true }).isVisible(), true)
   await page.getByRole('button', { name: '示例聊天', exact: true }).click()
   assert.equal(await page.locator('[data-composer-card]').evaluate((el) => getComputedStyle(el).borderRadius), '0px')
   assert.equal(await page.locator('.mock_primary').evaluate((el) => getComputedStyle(el).borderRadius), '0px')
@@ -178,7 +177,7 @@ try {
   pass('A chosen theme applies at once; pixel styling changes geometry and supports host dark mode')
 
   await openMore()
-  await page.getByRole('button', { name: '另存为', exact: true }).click()
+  await page.getByRole('button', { name: '另存为副本', exact: true }).click()
   assert.equal(await page.locator('.sw-saved .sw-card').count(), 2)
   assert.match(await page.getByLabel('皮肤名称', { exact: true }).inputValue(), /副本/)
   await page.getByLabel('皮肤名称', { exact: true }).fill('改个名称')
@@ -212,7 +211,7 @@ try {
   await page.locator('input[aria-label="上传壁纸文件"]').setInputFiles({ name: 'original-wallpaper.png', mimeType: 'image/png', buffer: Buffer.from(image, 'base64') })
   await page.locator('[data-bg-preview="image"]').waitFor()
   await page.getByLabel('皮肤名称', { exact: true }).fill('我的玻璃壁纸')
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY)
   assert.match(stored.active.skin.wallpaper.image, /^data:image\/webp;base64,/)
   const downloadEvent = page.waitForEvent('download')
@@ -223,9 +222,9 @@ try {
   assert.equal(JSON.parse(exported).skin.wallpaper.image, stored.active.skin.wallpaper.image)
   await page.getByRole('button', { name: '恢复默认', exact: true }).click()
   await page.locator('input[aria-label="导入分享包文件"]').setInputFiles({ name: 'import.dsh-skin.json', mimeType: 'application/json', buffer: Buffer.from(exported) })
-  await page.getByText('已导入到编辑器，尚未应用。确认无误后点「保存并应用」。', { exact: true }).waitFor()
+  await page.getByText('已导入到编辑器，尚未应用。确认无误后点「保存到我的皮肤」。', { exact: true }).waitFor()
   assert.equal(await page.evaluate(() => document.body.hasAttribute('data-sw-skin')), false)
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'glass')
   pass('Local wallpaper is rasterized; export includes pixels; importing validates and stages it without silently applying')
 
@@ -306,7 +305,7 @@ try {
   await openAdvanced()
   await page.getByLabel('壁纸不透明度', { exact: true }).press('Home')
   // Advanced sliders are draft edits; the first-screen controls already apply live.
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   assert.equal(await page.locator('.sw-wallpaper__image').evaluate(el => getComputedStyle(el).opacity), '0')
   await openAdvanced()
   assert.equal(await page.getByLabel('面板不透明度', { exact: true }).inputValue(), '0')
@@ -324,7 +323,7 @@ try {
   assert.equal(await page.locator('[data-recipe-theme]').innerText(), '原生风格')
   await openAdvanced()
   await page.getByLabel('壁纸不透明度', { exact: true }).press('End')
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   assert.equal(await page.locator('.sw-wallpaper__image').evaluate(el => getComputedStyle(el).opacity), '1')
   pass('Wallpaper opacity reaches the actual layer; removing or replacing background never resets the chosen theme or other opacity controls')
 
@@ -352,7 +351,7 @@ try {
 
   await page.getByLabel('皮肤名称', { exact: true }).fill('无法保存的修改')
   await page.evaluate(() => { window.__originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Quota exceeded','QuotaExceededError')} })
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   await page.getByRole('alert').filter({ hasText: '本地保存失败' }).waitFor()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), previousLibrary)
   await page.evaluate(() => { Storage.prototype.setItem=window.__originalSetItem })
@@ -363,18 +362,16 @@ try {
   await page.getByRole('button', { name: '放弃并切换', exact: true }).click({ timeout: 2000 }).catch(() => {})
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
   const afterCombo = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
-  // Preview a draft-only tweak: it must not be written and must roll back.
-  await openTab('换皮肤')
-  await openAdvanced()
-  await page.getByLabel('面板不透明度', { exact: true }).press('Home')
+  // A timed preview never writes storage, and it ends by itself.
   await page.clock.install()
   await page.getByRole('button', { name: '试穿 60 秒', exact: true }).click()
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
+  assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), afterCombo)
   await page.clock.fastForward(61_000)
   await page.waitForFunction(() => document.querySelector('.sw-livebar')?.hidden === true)
   assert.equal(await page.locator('.sw-livebar').isVisible(), false)
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), afterCombo)
-  pass('A real browser timer rolls back a 60-second preview and never writes storage')
+  pass('A real browser timer runs a 60-second preview without ever writing storage')
 
   // Uploading answers immediately: the picked image is echoed with a success
   // label instead of disappearing into a silent state.
@@ -386,6 +383,14 @@ try {
   assert.equal((await page.locator('.sw-bgcard-copy strong').innerText()).trim(), '✓ 壁纸已上传')
   assert.equal(await page.getByRole('button', { name: '换一张', exact: true }).isVisible(), true)
   pass('Choosing a file echoes the image back with a success label and a 换一张 action')
+
+  // The undo promised by the notice must actually exist and work.
+  const beforeUndo = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) || '{}')?.active?.skin?.wallpaper?.preset ?? null, STORAGE_KEY)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  assert.equal(await page.locator('[data-bg-preview="image"]').count(), 0)
+  const afterUndo = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) || '{}')?.active?.skin?.wallpaper?.preset ?? null, STORAGE_KEY)
+  assert.equal(afterUndo, beforeUndo)
+  pass('The 撤销 button in the notice really reverts the last applied change')
 
   // Dropping a file on the highlighted zone must run the same local pipeline.
   const dropSkin = (await readDraft()).skin.wallpaper.image
@@ -452,12 +457,21 @@ try {
   await page.getByRole('button', { name: '试穿 60 秒', exact: true }).click()
   await page.getByRole('button', { name: '保留并应用', exact: true }).click()
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
+  // A preview kept this way becomes a real saved skin, and can be deleted.
+  await openTab('我的皮肤')
+  await page.locator('.sw-saved .sw-card').first().click()
+  await openTab('换皮肤')
   await openMore()
-  await page.getByRole('button', { name: '删除', exact: true }).click()
+  const savedCount = await page.locator('.sw-saved .sw-card').count()
+  await page.getByRole('button', { name: '删除这款皮肤', exact: true }).click()
   await page.getByRole('button', { name: '确认删除', exact: true }).click()
+  assert.equal(await page.locator('.sw-saved .sw-card').count(), savedCount - 1)
+  // Deleting a saved entry must not silently repaint the live appearance.
+  assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
+  await page.getByRole('button', { name: '恢复默认', exact: true }).click()
   assert.equal(await page.evaluate(() => document.body.hasAttribute('data-sw-skin')), false)
   assert.equal(await page.evaluate(() => window.__themeLayers.size), 0)
-  pass('Keeping preview persists a skin; deleting the active skin returns to DSH default')
+  pass('Keeping a preview saves a real skin; deleting it leaves the live skin alone, and 恢复默认 clears the shell')
 
   await page.getByRole('button', { name: '试穿 60 秒', exact: true }).click()
   await page.getByRole('button', { name: '保留并应用', exact: true }).click()
@@ -475,8 +489,7 @@ try {
   await page.reload()
   await page.getByText(/本机皮肤库无法读取/).waitFor()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), '{broken')
-  await openMore()
-  await page.getByRole('button', { name: '仅保存', exact: true }).click()
+  await page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }).click()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), RECOVERY_KEY), '{broken')
   pass('Corrupt preferences fail safely and are backed up before new saves')
 

@@ -216,4 +216,7 @@ body[data-ds-dark-theme] .sw-livebar small{color:#ffacb3}
 .sw-bgcard--active{border-color:var(--sw-ui-accent);background:color-mix(in srgb,var(--sw-ui-accent) 6%,var(--sw-ui-card))}
 .sw-applied{font-size:12px;color:var(--sw-ui-muted)}
 .sw-notice{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.sw-savebar-head h3{font-size:13px;font-weight:650;margin:0 0 3px}
+.sw-savebar-head p{font-size:11px;line-height:1.7;color:var(--sw-ui-muted);margin:0 0 4px}
+.sw-savebar-secondary{margin-left:auto}
 `

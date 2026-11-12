@@ -38,7 +38,7 @@ const browser = await chromium.launch({ headless: true })
 const artifacts = process.env.DSH_TEST_ARTIFACT_DIR
 if (artifacts) await mkdir(artifacts, { recursive: true })
 const openTab = async (name) => { await page.getByRole('tab', { name: new RegExp('^' + name) }).click() }
-const applyIfNeeded = async () => { const b = page.getByRole('button', { name: '保存并应用', exact: true }); if (await b.count()) await b.click() }
+const applyIfNeeded = async () => { const b = page.getByRole('button', { name: /^保存(到我的皮肤|修改)$/ }); if (await b.count()) await b.click() }
 const openAdvanced = async () => { const s = page.locator('.sw-advanced>summary'); if (await s.count() && !(await page.locator('.sw-advanced').evaluate((el) => el.open))) await s.click() }
 const failures = [], errors = [], external = [], observations = []
 let passed = 0, page
@@ -93,7 +93,7 @@ try {
   await page.getByLabel('皮肤名称',{exact:true}).fill('原生外观')
   for(const dark of [false,true]){
     await page.evaluate(dark=>window.__setDark(dark),dark)
-    const primary=page.getByRole('button',{name:'保存并应用',exact:true}),colors=await actionContrast(primary)
+    const primary=page.getByRole('button',{name:/^保存(到我的皮肤|修改)$/}),colors=await actionContrast(primary)
     observations.push({case:dark?'native-primary-dark':'native-primary-light',...colors})
     check(`Native ${dark?'dark':'light'} Save-and-apply is not black-on-black/white-on-white`,colors.ratio>=4.5,JSON.stringify(colors))
     await primary.hover();const hover=await actionContrast(primary)
@@ -260,7 +260,7 @@ try {
 
   // Verify data-independent imported packs still work in the native fixture.
   await page.locator('input[aria-label="导入分享包文件"]').setInputFiles({name:'legacy.dsh-skin.json',mimeType:'application/json',buffer:Buffer.from(legacyXP)})
-  await page.getByText('已导入到编辑器，尚未应用。确认无误后点「保存并应用」。',{exact:true}).waitFor()
+  await page.getByText('已导入到编辑器，尚未应用。确认无误后点「保存到我的皮肤」。',{exact:true}).waitFor()
   check('Existing version-1 packs import without a migration or automatic application',await page.locator('body').getAttribute('data-sw-template')==='glass')
   await page.getByRole('button',{name:'恢复默认',exact:true}).click()
   await page.getByRole('button',{name:'原生插件页',exact:true}).click()

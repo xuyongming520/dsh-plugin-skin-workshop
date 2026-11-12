@@ -81,6 +81,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
     const [undoSnapshot, setUndoSnapshot] = React.useState(null)
     // True when the draft holds edits the user has not applied yet.
     const [pending, setPending] = React.useState(false)
+    const draftRef = React.useRef(null)
     const [message, setMessage] = React.useState('')
     const [error, setError] = React.useState('')
     const [busy, setBusy] = React.useState('')
@@ -90,10 +91,14 @@ export function createWorkshopUI(React, store, openWorkbench) {
     const operation = React.useRef(0)
     const mounted = React.useRef(true)
     const blockPrefix = React.useId()
+    draftRef.current = draft
     const dirty = !sameSkin(draft, baseline)
     const dirtyRef = React.useRef(dirty)
     dirtyRef.current = dirty
-    const selectedSaved = state.skins.some((entry) => entry.id === selectedId)
+    // The live slot is "what is on screen right now", not one of the user's saves.
+    const LIVE_ID = 'skin-live'
+    const savedSkins = state.skins.filter((entry) => entry.id !== LIVE_ID)
+    const selectedSaved = savedSkins.some((entry) => entry.id === selectedId)
     const previewDraft = React.useMemo(() => ({ ...draft, name: draft.name.trim() || '未命名皮肤' }), [draft])
     const noBackground = draft.wallpaper.kind === 'none'
     const nativeStyle = draft.template === 'native'
@@ -124,11 +129,20 @@ export function createWorkshopUI(React, store, openWorkbench) {
       setError('')
       try { action() } catch (failure) { setError(failure?.message ?? '操作失败，请再试一次。') }
     }
-    const edit = (change) => {
+    const editMeta = (change) => {
       setPending(true)
-      setDraft((previous) => typeof change === 'function' ? change(previous) : { ...previous, ...change })
+      setDraft((previous) => ({ ...previous, ...change }))
       setError('')
       setMessage('')
+    }
+    // Every visual control takes effect on its own; the debounce keeps a slider
+    // drag from writing storage on each pixel of movement.
+    const edit = (change) => {
+      const next = typeof change === 'function' ? change(draftRef.current) : { ...draftRef.current, ...change }
+      setDraft(next)
+      setError('')
+      setMessage('')
+      applySoon(next)
     }
     // Changes remain local unless the user explicitly started a timed preview.
     React.useEffect(() => {
@@ -157,7 +171,10 @@ export function createWorkshopUI(React, store, openWorkbench) {
     }
     const save = (apply = false, copy = false) => run(() => {
       const next = validateSkin(copy ? { ...draft, name: `${draft.name.trim().slice(0, 35)} 副本` } : draft)
-      const id = store.save(next, { id: selectedId, apply, copy })
+      // Saving the live appearance creates a real entry; editing a saved skin
+      // updates that one.
+      const target = selectedSaved ? selectedId : null
+      const id = store.save(next, { id: target, apply, copy })
       if (!apply) store.cancelPreview()
       setSelectedId(id)
       setDraft(cloneSkin(next))
@@ -175,11 +192,12 @@ export function createWorkshopUI(React, store, openWorkbench) {
       // the change just because the name field is empty.
       const next = validateSkin({ ...skin, name: (skin.name ?? '').trim() || TEMPLATE_INFO[skin.template].title })
       const previous = state.active ? cloneSkin(state.active) : null
-      const id = store.save(next, { id: selectedId, apply: true })
+      // Always write the live slot: browsing must not overwrite a named skin.
+      const id = store.save(next, { id: LIVE_ID, apply: true, reuseId: true })
       setSelectedId(id)
       setDraft(cloneSkin(next))
       setBaseline(cloneSkin(next))
-      setUndoSnapshot(previous)
+      setUndoSnapshot(previous ?? { id: null, skin: null })
       setPending(false)
       setError('')
       setMessage(note)
@@ -192,7 +210,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
     }
     React.useEffect(() => () => { if (liveTimer.current) clearTimeout(liveTimer.current) }, [])
     const undoApplied = () => run(() => {
-      if (undoSnapshot) {
+      if (undoSnapshot?.skin) {
         store.save(cloneSkin(undoSnapshot.skin), { id: undoSnapshot.id, apply: true })
         setSelectedId(undoSnapshot.id)
         setDraft(cloneSkin(undoSnapshot.skin))
@@ -218,7 +236,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
       try {
         const skin = await readSkinFile(file)
         if (!mounted.current || token !== operation.current) return
-        requestReplace(() => replaceDraft(skin, null, '已导入到编辑器，尚未应用。确认无误后点「保存并应用」。', { pending: true }))
+        requestReplace(() => replaceDraft(skin, null, '已导入到编辑器，尚未应用。确认无误后点「保存到我的皮肤」。', { pending: true }))
       } catch (failure) {
         if (mounted.current && token === operation.current) setError(failure.message)
       } finally {
@@ -234,7 +252,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
         const image = await readWallpaperFile(file)
         if (!mounted.current || token !== operation.current) return
         setJustUploaded(true)
-        applyNow({ ...draft, wallpaper: { ...draft.wallpaper, kind: 'image', image } }, '壁纸已应用。想恢复原样，点下面「撤销」。')
+        applyNow({ ...draft, wallpaper: { ...draft.wallpaper, kind: 'image', image } }, '壁纸已应用。')
       } catch (failure) {
         if (mounted.current && token === operation.current) setError(failure.message)
       } finally {
@@ -385,7 +403,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
           h('div', { className: 'sw-mine-actions' },
             h(Button, { disabled: !!busy, onClick: () => skinInput.current?.click() }, busy === 'import' ? '正在读取…' : '导入分享包'),
             h('span', { className: 'sw-subtle' }, `${state.skins.length} / 16 款`)),
-          state.skins.length ? h('div', { className: 'sw-saved' }, state.skins.map((entry) => h(SkinCard, {
+          savedSkins.length ? h('div', { className: 'sw-saved' }, savedSkins.map((entry) => h(SkinCard, {
             key: entry.id, skin: entry.skin, dark, selected: selectedId === entry.id, active: state.active?.id === entry.id,
             onClick: () => requestReplace(() => replaceDraft(entry.skin, entry.id)),
           }))) : h('div', { className: 'sw-empty' }, '把喜欢的搭配存下来。', h('br'), '主题、壁纸与材质一起保存。'),
@@ -395,21 +413,22 @@ export function createWorkshopUI(React, store, openWorkbench) {
             onClick: () => requestReplace(() => applyNow(skin, `已应用「${COMBINATION_INFO[id].title}」，整窗立刻生效。`)),
           }))),
           h('p', { className: 'sw-note' }, '仅保存在当前浏览器 / 设备。「导出分享包」包含整套参数与上传的壁纸，可发给同样安装了皮肤工坊的人。')),
-        h('div', { className: 'sw-savebar' },
-          h('label', { className: 'sw-field sw-name-field' }, h('span', null, '皮肤名称'), h('input', { type: 'text', value: draft.name, maxLength: 40, placeholder: '给整套搭配起个名字', onChange: (event) => edit({ name: event.target.value }) })),
-          // Two obvious actions; everything else folds into 更多.
+        // This block exists for one job: keep the skin, or hand it to someone.
+        h('div', { className: 'sw-savebar', 'data-share': true },
+          h('div', { className: 'sw-savebar-head' },
+            h('h3', null, '保存与分享'),
+            h('p', null, '存下来，下次直接用；导出成分享包，别人导入就有一模一样的外观。')),
+          h('label', { className: 'sw-field sw-name-field' }, h('span', null, '皮肤名称'), h('input', { type: 'text', value: draft.name, maxLength: 40, placeholder: '给这套皮肤起个名字', onChange: (event) => editMeta({ name: event.target.value }) })),
           h('div', { className: 'sw-savebar-row' },
-            h('details', { className: 'sw-details sw-more' }, h('summary', null, '更多'),
-              h('div', { className: 'sw-actions sw-more-actions' },
-                h(Button, { disabled: !!busy, onClick: () => save(false) }, selectedSaved ? '保存修改' : '仅保存'),
-                h(Button, { disabled: !!busy, onClick: () => save(false, true) }, '另存为'),
-                h(Button, { disabled: !!busy, onClick: () => run(() => { downloadSkin(draft); setMessage('已发起分享包下载，包含整套搭配参数和上传的壁纸。') }) }, '导出分享包'),
-                selectedSaved ? h(Button, { tone: 'danger', onClick: remove }, '删除') : null)),
-            h('div', { className: 'sw-actions sw-savebar-primary' },
-              h(Button, { disabled: !!busy, onClick: () => run(() => { store.previewSkin(previewDraft, selectedId); setMessage('试穿不会保存，离开工坊也可通过右下角浮条撤销；60 秒后自动恢复。') }) }, `试穿 ${PREVIEW_SECONDS} 秒`),
-              pending
-                ? h(Button, { tone: 'primary', disabled: !!busy, onClick: () => save(true) }, '保存并应用')
-                : state.active ? h('span', { className: 'sw-applied', 'data-applied': true }, '已应用') : null))),
+            h('div', { className: 'sw-actions' },
+              h(Button, { tone: 'primary', disabled: !!busy, onClick: () => save(true) }, selectedSaved ? '保存修改' : '保存到我的皮肤'),
+              h(Button, { disabled: !!busy, onClick: () => run(() => { downloadSkin(draft); setMessage('已导出分享包，发给别人导入即可。') }) }, '导出分享包')),
+            h('div', { className: 'sw-actions sw-savebar-secondary' },
+              h(Button, { tone: 'ghost', disabled: !!busy, onClick: () => run(() => { store.previewSkin(previewDraft, selectedId); setMessage('试穿 60 秒后自动恢复，也可在右下角提前结束。') }) }, `试穿 ${PREVIEW_SECONDS} 秒`),
+              h('details', { className: 'sw-details sw-more' }, h('summary', null, '更多'),
+                h('div', { className: 'sw-actions sw-more-actions' },
+                  h(Button, { disabled: !!busy, onClick: () => save(false, true) }, '另存为副本'),
+                  selectedSaved ? h(Button, { tone: 'danger', onClick: remove }, '删除这款皮肤') : null))))),
         message ? h('div', { className: 'sw-notice', role: 'status' },
           h('span', null, message),
           undoSnapshot ? h(Button, { tone: 'ghost', onClick: undoApplied }, '撤销') : null) : null,
@@ -419,7 +438,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
           h('span', null, h('small', null, '背景'), h('strong', { 'data-recipe-background': true }, backgroundLabel)),
           h('i', { 'aria-hidden': true }, '＋'),
           h('span', null, h('small', null, '材质'), h('strong', { 'data-recipe-material': true }, draft.material === 'solid' ? '不透明面板' : `磨砂玻璃 · ${draft.opacity}%`))),
-        h('label', { className: 'sw-toggle', style: { marginTop: 12 } }, h('input', { type: 'checkbox', checked: draft.motion, onChange: (event) => edit({ motion: event.target.checked }) }), '工坊入场与悬停动效（尊重系统减少动态效果设置）'),
+        h('label', { className: 'sw-toggle', style: { marginTop: 12 } }, h('input', { type: 'checkbox', checked: draft.motion, onChange: (event) => editMeta({ motion: event.target.checked }) }), '工坊入场与悬停动效（尊重系统减少动态效果设置）'),
         h('p', { className: 'sw-note' }, '换皮肤管背景与材质，换主题管配色与控件形状，两块自由组合后整套保存。覆盖原生侧栏、标题与聊天等主要区域；第三方页面和内嵌网站不保证整套覆盖。复古、像素为风格化实现。')))
   }
 
