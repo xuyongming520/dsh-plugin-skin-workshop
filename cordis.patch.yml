@@ -1,0 +1,4 @@
+- insert:
+    - id: violet-skin
+      name: '@local/violet-skin'
+      config: {}

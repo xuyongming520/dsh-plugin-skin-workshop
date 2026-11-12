@@ -1,0 +1,28 @@
+{
+  "format": "dsh-skin-workshop",
+  "version": 2,
+  "skin": {
+    "name": "只换背景",
+    "template": "native",
+    "material": "glass",
+    "opacity": 55,
+    "blur": 14,
+    "readingOpacity": 45,
+    "radius": 12,
+    "border": 1,
+    "shadow": 20,
+    "motion": true,
+    "wallpaper": {
+      "kind": "preset",
+      "preset": "mist",
+      "image": "",
+      "fit": "cover",
+      "x": 50,
+      "y": 50,
+      "zoom": 100,
+      "opacity": 100,
+      "dim": 0,
+      "blur": 0
+    }
+  }
+}

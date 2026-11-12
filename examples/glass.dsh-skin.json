@@ -1,0 +1,26 @@
+{
+  "format": "dsh-skin-workshop",
+  "version": 1,
+  "skin": {
+    "name": "玻璃壁纸",
+    "template": "glass",
+    "material": "glass",
+    "opacity": 84,
+    "blur": 18,
+    "radius": 18,
+    "border": 1,
+    "shadow": 20,
+    "motion": true,
+    "wallpaper": {
+      "kind": "preset",
+      "preset": "mist",
+      "image": "",
+      "fit": "cover",
+      "x": 50,
+      "y": 50,
+      "zoom": 100,
+      "dim": 12,
+      "blur": 0
+    }
+  }
+}

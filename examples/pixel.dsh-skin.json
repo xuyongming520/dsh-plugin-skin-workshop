@@ -1,0 +1,26 @@
+{
+  "format": "dsh-skin-workshop",
+  "version": 1,
+  "skin": {
+    "name": "像素方块",
+    "template": "pixel",
+    "material": "solid",
+    "opacity": 100,
+    "blur": 0,
+    "radius": 0,
+    "border": 2,
+    "shadow": 12,
+    "motion": true,
+    "wallpaper": {
+      "kind": "preset",
+      "preset": "blocks",
+      "image": "",
+      "fit": "cover",
+      "x": 50,
+      "y": 50,
+      "zoom": 100,
+      "dim": 8,
+      "blur": 0
+    }
+  }
+}
