@@ -863,6 +863,22 @@ body[data-ds-dark-theme] .sw-livebar small{color:#ffacb3}
 .sw-page[data-motion="off"] *{animation:none!important;transition:none!important}
 .sw-page[data-motion="off"] .sw-card:hover,.sw-page[data-motion="off"] .sw-btn:active{transform:none}
 @keyframes sw-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* Background echo card: shows the picked image instead of a bare prompt. */
+.sw-bgcard{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:stretch;margin:2px 0 14px;padding:10px;border:1px solid var(--sw-ui-line);border-radius:14px;background:var(--sw-ui-card)}
+.sw-bgcard-thumb{min-height:88px;border-radius:10px;background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:inset 0 0 0 1px #00000012}
+.sw-bgcard-copy{display:flex;flex-direction:column;gap:4px;min-width:0;justify-content:center}
+.sw-bgcard-copy strong{font-size:13px;font-weight:650}
+.sw-bgcard-copy>span{font-size:11px;line-height:1.7;color:var(--sw-ui-muted)}
+.sw-bgcard-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sw-reading-control--top{margin-top:16px}
+.sw-advanced{margin-top:18px}
+.sw-more{flex:none;align-self:center}
+.sw-more>summary{margin-top:0}
+.sw-more-actions{margin-top:10px;gap:8px}
+.sw-savebar-primary{margin-left:auto}
+.sw-name-field{max-width:340px;margin:0}
+.sw-bgcard--active{border-color:var(--sw-ui-accent);background:color-mix(in srgb,var(--sw-ui-accent) 6%,var(--sw-ui-card))}
 `
 
 
@@ -945,6 +961,7 @@ function createWorkshopUI(React, store, openWorkbench) {
     const [selectedId, setSelectedId] = React.useState(initial.selectedId)
     const [editorTab, setEditorTab] = React.useState(initial.editorTab ?? 'skin')
     const [dragging, setDragging] = React.useState(false)
+    const [justUploaded, setJustUploaded] = React.useState(false)
     const [message, setMessage] = React.useState('')
     const [error, setError] = React.useState('')
     const [busy, setBusy] = React.useState('')
@@ -1055,6 +1072,7 @@ function createWorkshopUI(React, store, openWorkbench) {
         const image = await readWallpaperFile(file)
         if (!mounted.current || token !== operation.current) return
         editWallpaper({ kind: 'image', image })
+        setJustUploaded(true)
         setMessage('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。')
       } catch (failure) {
         if (mounted.current && token === operation.current) setError(failure.message)
@@ -1089,7 +1107,8 @@ function createWorkshopUI(React, store, openWorkbench) {
           h('span', { className: 'sw-top-tag' }, '换皮肤 · 换主题 · 我的皮肤')),
         h('div', { className: 'sw-top-meta' },
           h('span', null, '当前外观'),
-          h('span', { className: 'sw-badge sw-badge--active', 'data-current-skin': true }, currentLabel))),
+          h('span', { className: 'sw-badge sw-badge--active', 'data-current-skin': true }, currentLabel),
+          h(Button, { tone: 'ghost', onClick: () => run(() => { store.restoreDefault(); setMessage('') }) }, '恢复默认'))),
       state.notice ? h('div', { className: 'sw-top-notice' }, h('div', { className: 'sw-notice', role: 'status' }, h('span', null, state.notice), h(Button, { tone: 'ghost', onClick: store.dismissNotice, 'aria-label': '关闭状态提示' }, '×'))) : null,
       h('div', { className: 'sw-workspace' },
         confirm ? h('div', { className: 'sw-notice sw-notice--confirm', role: 'alert', style: { marginBottom: 12 } },
@@ -1103,8 +1122,8 @@ function createWorkshopUI(React, store, openWorkbench) {
           onClick: () => setEditorTab(id), onKeyDown: tabKey,
         }, h('span', { className: 'sw-tab-title' }, title), h('span', { className: 'sw-tab-hint' }, hint)))),
         h('section', panelProps('skin'),
-          h('p', { className: 'sw-panel-lead' }, '先放一张图，再决定它有多透。'),
-          h('button', {
+          h('p', { className: 'sw-panel-lead' }, '上传一张图就能看到效果。其余参数都收在「高级」里，需要时再展开。'),
+          noBackground ? h('button', {
             type: 'button', className: `sw-dropzone${dragging ? ' sw-dropzone--active' : ''}`, disabled: !!busy,
             onClick: () => imageInput.current?.click(),
             onDragOver: (event) => { event.preventDefault(); if (!dragging) setDragging(true) },
@@ -1118,36 +1137,56 @@ function createWorkshopUI(React, store, openWorkbench) {
           h('strong', null, busy === 'image' ? '正在本机压缩…' : '上传一张壁纸'),
           h('span', { className: 'sw-dropzone-main' }, '把图片拖到这里，或点击选择'),
           h('small', null, 'PNG / JPEG / WebP · 原图最大 10 MB · 自动压到最长边 1920'),
-          h('small', { className: 'sw-dropzone-note' }, '只在本机处理并嵌入皮肤，不会上传到任何外部服务。')),
-          h('div', { className: 'sw-background-current' }, h('span', null, '当前背景：', backgroundLabel), h(Button, { tone: 'ghost', disabled: noBackground, onClick: () => { operation.current++; setBusy(''); editWallpaper({ kind: 'none', image: '' }) } }, '移除背景')),
-          h('div', { className: 'sw-control-grid' },
-            h(Slider, { label: '壁纸不透明度', value: draft.wallpaper.opacity, unit: '%', disabled: noBackground, onChange: (opacity) => editWallpaper({ opacity }) }),
-            h(Slider, { label: '背景模糊', value: draft.wallpaper.blur, max: 24, unit: 'px', disabled: noBackground, onChange: (blur) => editWallpaper({ blur }) }),
-            h(Select, { label: '图片填充', value: draft.wallpaper.fit, disabled: noBackground, options: [['cover', '铺满'], ['contain', '完整显示'], ['tile', '平铺']], onChange: (fit) => editWallpaper({ fit }) })),
-          h('details', { className: 'sw-details' }, h('summary', null, '背景位置与压暗'), h('div', { className: 'sw-control-grid' },
-            h(Slider, { label: '横向位置', value: draft.wallpaper.x, unit: '%', disabled: noBackground, onChange: (x) => editWallpaper({ x }) }),
-            h(Slider, { label: '纵向位置', value: draft.wallpaper.y, unit: '%', disabled: noBackground, onChange: (y) => editWallpaper({ y }) }),
-            h(Slider, { label: '背景缩放', value: draft.wallpaper.zoom, min: 100, max: 180, unit: '%', disabled: noBackground, onChange: (zoom) => editWallpaper({ zoom }) }),
-            h(Slider, { label: '背景压暗', value: draft.wallpaper.dim, max: 65, unit: '%', disabled: noBackground, onChange: (dim) => editWallpaper({ dim }) }))),
-          h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '或者先用一张内置背景'), h('p', null, '不挑图也能试。选内置背景不会动主题和材质。')),
+          h('small', { className: 'sw-dropzone-note' }, '只在本机处理并嵌入皮肤，不会上传到任何外部服务。'))
+          : h('div', {
+            className: `sw-bgcard${dragging ? ' sw-bgcard--active' : ''}`,
+            onDragOver: (event) => { event.preventDefault(); if (!dragging) setDragging(true) },
+            onDragLeave: () => setDragging(false),
+            onDrop: (event) => { event.preventDefault(); setDragging(false); const file = event.dataTransfer?.files?.[0]; if (file) void uploadWallpaper(file) },
+          },
+            // Echo the chosen background: the user must be able to see what they picked.
+            h('div', {
+              className: 'sw-bgcard-thumb', 'data-bg-preview': draft.wallpaper.kind,
+              'aria-hidden': true,
+              style: { backgroundImage: draft.wallpaper.kind === 'image' ? `url("${draft.wallpaper.image}")` : PRESET_BACKGROUNDS[draft.wallpaper.preset] },
+            }),
+            h('div', { className: 'sw-bgcard-copy' },
+              h('strong', null, draft.wallpaper.kind === 'image'
+                ? (justUploaded ? '✓ 壁纸已上传' : '当前壁纸')
+                : `内置背景 · ${backgroundLabel}`),
+              h('span', null, draft.wallpaper.kind === 'image'
+                ? (justUploaded ? '已在本机压缩并嵌入皮肤，下方按钮可换一张或移除。' : '已嵌入皮肤，可换一张或移除。')
+                : '来自工坊内置背景，点下面任意一张可替换。'),
+              h('div', { className: 'sw-bgcard-actions' },
+                h(Button, { disabled: !!busy, onClick: () => imageInput.current?.click() }, busy === 'image' ? '正在压缩…' : '换一张'),
+                h(Button, { tone: 'ghost', onClick: () => { operation.current++; setBusy(''); setJustUploaded(false); editWallpaper({ kind: 'none', image: '' }) } }, '移除背景')))),
           h('div', { className: 'sw-bg-options', role: 'group', 'aria-label': '内置背景' }, Object.entries(BACKGROUND_INFO).map(([key, text]) => h('button', {
             key, type: 'button', className: 'sw-bg-option', 'aria-pressed': draft.wallpaper.kind === 'preset' && draft.wallpaper.preset === key,
-            onClick: () => { operation.current++; setBusy(''); editWallpaper({ kind: 'preset', preset: key, image: '' }); setEditorTab('skin') },
+            onClick: () => { operation.current++; setBusy(''); setJustUploaded(false); editWallpaper({ kind: 'preset', preset: key, image: '' }); setEditorTab('skin') },
           }, h('span', { style: { backgroundImage: PRESET_BACKGROUNDS[key] } }), text))),
-          h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '材质与阅读'), h('p', null, '面板控制侧栏、输入框与气泡；阅读遮罩单独保护正文，互不绑定。')),
-          h('div', { className: 'sw-material-controls' },
-            h('div', { className: 'sw-control-stack' },
-              h(Select, { label: '面板材质', value: draft.material, options: [['glass', '磨砂玻璃'], ['solid', '不透明面板']], onChange: (material) => edit({ material }) }),
-              h(Slider, { label: '面板不透明度', value: draft.opacity, unit: '%', disabled: draft.material === 'solid', onChange: (opacity) => edit({ opacity }) }),
-              h(Slider, { label: '磨砂强度', value: draft.blur, max: 28, unit: 'px', disabled: draft.material === 'solid', onChange: (blur) => edit({ blur }) })),
-            h('div', { className: 'sw-reading-control' }, h('span', { className: 'sw-reading-icon', 'aria-hidden': true }, 'Aa'),
-              h(Slider, { label: '正文阅读遮罩', value: draft.readingOpacity, unit: '%', onChange: (readingOpacity) => edit({ readingOpacity }) }),
-              h('p', { className: 'sw-hint' }, `这一层决定正文后面的壁纸还剩多少：现在是「${100 - draft.readingOpacity}% 可见」。30–45% 时壁纸清楚、字仍可读；70% 以上更偏工作台；0% 完全通透。`))),
+          h('div', { className: 'sw-reading-control sw-reading-control--top' }, h('span', { className: 'sw-reading-icon', 'aria-hidden': true }, 'Aa'),
+            h(Slider, { label: '正文阅读遮罩', value: draft.readingOpacity, unit: '%', onChange: (readingOpacity) => edit({ readingOpacity }) }),
+            h('p', { className: 'sw-hint' }, `壁纸在正文里还剩「${100 - draft.readingOpacity}% 可见」。30–45% 壁纸清楚、字也能读；越高越像普通工作台。`)),
           h('div', { className: 'sw-actions sw-quick-opacity' }, h('span', { className: 'sw-subtle' }, '一键调节'),
             h(Button, { onClick: () => edit({ material: 'glass', opacity: 40, readingOpacity: 30 }) }, '更通透'),
             h(Button, { onClick: () => edit({ opacity: 80, readingOpacity: 80 }) }, '更清晰')),
           draft.wallpaper.kind !== 'none' && draft.readingOpacity < 30 ? h('p', { className: 'sw-hint sw-hint--warn', role: 'status' }, '正文遮罩低于 30%，壁纸很显眼，但复杂图片上的小字可能发花。看不清就点「更清晰」，或把遮罩调回 40% 左右。') : null,
-          h('p', { className: 'sw-hint' }, '不透明面板只关闭面板透光与磨砂，正文遮罩仍可独立调节。菜单、弹窗和提示保留安全底色。')),
+          h('details', { className: 'sw-details sw-advanced' }, h('summary', null, '高级：壁纸与面板'),
+            h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '壁纸细节'), h('p', null, '只影响图片本身，不动主题。')),
+            h('div', { className: 'sw-control-grid' },
+              h(Slider, { label: '壁纸不透明度', value: draft.wallpaper.opacity, unit: '%', disabled: noBackground, onChange: (opacity) => editWallpaper({ opacity }) }),
+              h(Slider, { label: '背景模糊', value: draft.wallpaper.blur, max: 24, unit: 'px', disabled: noBackground, onChange: (blur) => editWallpaper({ blur }) }),
+              h(Select, { label: '图片填充', value: draft.wallpaper.fit, disabled: noBackground, options: [['cover', '铺满'], ['contain', '完整显示'], ['tile', '平铺']], onChange: (fit) => editWallpaper({ fit }) }),
+              h(Slider, { label: '横向位置', value: draft.wallpaper.x, unit: '%', disabled: noBackground, onChange: (x) => editWallpaper({ x }) }),
+              h(Slider, { label: '纵向位置', value: draft.wallpaper.y, unit: '%', disabled: noBackground, onChange: (y) => editWallpaper({ y }) }),
+              h(Slider, { label: '背景缩放', value: draft.wallpaper.zoom, min: 100, max: 180, unit: '%', disabled: noBackground, onChange: (zoom) => editWallpaper({ zoom }) }),
+              h(Slider, { label: '背景压暗', value: draft.wallpaper.dim, max: 65, unit: '%', disabled: noBackground, onChange: (dim) => editWallpaper({ dim }) })),
+            h('div', { className: 'sw-control-heading sw-sub-head' }, h('h4', null, '面板与磨砂'), h('p', null, '侧栏、输入框与气泡；与正文遮罩互不绑定。')),
+            h('div', { className: 'sw-control-stack' },
+              h(Select, { label: '面板材质', value: draft.material, options: [['glass', '磨砂玻璃'], ['solid', '不透明面板']], onChange: (material) => edit({ material }) }),
+              h(Slider, { label: '面板不透明度', value: draft.opacity, unit: '%', disabled: draft.material === 'solid', onChange: (opacity) => edit({ opacity }) }),
+              h(Slider, { label: '磨砂强度', value: draft.blur, max: 28, unit: 'px', disabled: draft.material === 'solid', onChange: (blur) => edit({ blur }) })),
+            h('p', { className: 'sw-hint' }, '不透明面板只关闭面板透光与磨砂，正文遮罩仍可独立调节。菜单、弹窗和提示保留安全底色。'))),
         h('section', panelProps('theme'),
           h('p', { className: 'sw-panel-lead' }, '主题只改配色与控件形状，不动壁纸、材质和阅读遮罩。'),
           h('div', { className: 'sw-theme-options', role: 'group', 'aria-label': '主题风格选择' }, Object.entries(TEMPLATE_INFO).map(([id, info]) => h('div', {
@@ -1197,14 +1236,15 @@ function createWorkshopUI(React, store, openWorkbench) {
           h('p', { className: 'sw-note' }, '仅保存在当前浏览器 / 设备。「导出分享包」包含整套参数与上传的壁纸，可发给同样安装了皮肤工坊的人。')),
         h('div', { className: 'sw-savebar' },
           h('label', { className: 'sw-field sw-name-field' }, h('span', null, '皮肤名称'), h('input', { type: 'text', value: draft.name, maxLength: 40, placeholder: '给整套搭配起个名字', onChange: (event) => edit({ name: event.target.value }) })),
+          // Two obvious actions; everything else folds into 更多.
           h('div', { className: 'sw-savebar-row' },
-            h('div', { className: 'sw-actions' },
-              h(Button, { tone: 'ghost', disabled: !!busy, onClick: () => run(() => { downloadSkin(draft); setMessage('已发起分享包下载，包含整套搭配参数和上传的壁纸。') }) }, '导出分享包'),
-              h(Button, { tone: 'ghost', disabled: !!busy, onClick: () => save(false, true) }, '另存为'),
-              h(Button, { tone: 'ghost', onClick: () => run(() => { store.restoreDefault(); setMessage('') }) }, '恢复默认'),
-              selectedSaved ? h(Button, { tone: 'danger', onClick: remove }, '删除') : null),
-            h('div', { className: 'sw-actions' },
-              h(Button, { disabled: !!busy, onClick: () => save(false) }, selectedSaved ? '保存修改' : '仅保存'),
+            h('details', { className: 'sw-details sw-more' }, h('summary', null, '更多'),
+              h('div', { className: 'sw-actions sw-more-actions' },
+                h(Button, { disabled: !!busy, onClick: () => save(false) }, selectedSaved ? '保存修改' : '仅保存'),
+                h(Button, { disabled: !!busy, onClick: () => save(false, true) }, '另存为'),
+                h(Button, { disabled: !!busy, onClick: () => run(() => { downloadSkin(draft); setMessage('已发起分享包下载，包含整套搭配参数和上传的壁纸。') }) }, '导出分享包'),
+                selectedSaved ? h(Button, { tone: 'danger', onClick: remove }, '删除') : null)),
+            h('div', { className: 'sw-actions sw-savebar-primary' },
               h(Button, { disabled: !!busy, onClick: () => run(() => { store.previewSkin(previewDraft, selectedId); setMessage('试穿不会保存，离开工坊也可通过右下角浮条撤销；60 秒后自动恢复。') }) }, `试穿 ${PREVIEW_SECONDS} 秒`),
               h(Button, { tone: 'primary', disabled: !!busy, onClick: () => save(true) }, '保存并应用')))),
         message ? h('div', { className: 'sw-notice', role: 'status' }, message) : null,

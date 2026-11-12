@@ -78,8 +78,17 @@ const selectStyle = async (id) => {
   await page.getByRole('button', { name: '主题：' + { native: '原生风格', glass: '现代简约', xp: 'XP 复古', pixel: '像素方块' }[id], exact: true }).click()
   await openTab('换皮肤')
 }
+const openAdvanced = async () => {
+  const summary = page.locator('.sw-advanced>summary')
+  if (await summary.count() && !(await page.locator('.sw-advanced').evaluate((el) => el.open))) await summary.click()
+}
+const openMore = async () => {
+  const summary = page.locator('.sw-more>summary')
+  if (await summary.count() && !(await page.locator('.sw-more').evaluate((el) => el.open))) await summary.click()
+}
 const readDraft = async () => {
   const event = page.waitForEvent('download')
+  await openMore()
   await page.getByRole('button', { name: '导出分享包', exact: true }).click()
   return JSON.parse(await readFile(await (await event).path(), 'utf8'))
 }
@@ -104,12 +113,16 @@ try {
   assert.equal(await page.getByRole('tab').count(), 3)
   assert.equal(await page.getByRole('tab', { name: /^换皮肤/ }).getAttribute('aria-selected'), 'true')
   assert.equal(await page.locator('.sw-tab-panel').count(), 3)
-  assert.equal(await page.getByRole('button', { name: /上传一张壁纸/ }).isVisible(), true)
+  // First screen: the background (prompt or echo card) plus the reading mask.
+  assert.equal(await page.locator('[data-bg-preview]').count(), 1)
+  assert.equal(await page.locator('[data-bg-preview]').getAttribute('data-bg-preview'), 'preset')
   // No large mock window in the header: the real page is the preview. The only
   // miniatures left are the small swatches on the skin cards.
   assert.equal(await page.locator('.sw-top .sw-mini').count(), 0)
-  assert.equal(await page.locator('.sw-top').evaluate((el) => el.offsetHeight < 90), true)
+  assert.equal(await page.locator('.sw-top').evaluate((el) => el.offsetHeight < 110), true)
   assert.equal(await page.locator('.sw-segment').count(), 0)
+  // 恢复默认 lives in the header, not among the save buttons.
+  assert.equal(await page.locator('.sw-top').getByRole('button', { name: '恢复默认', exact: true }).count(), 1)
   assert.equal(await page.getByLabel('正文阅读遮罩', { exact: true }).isVisible(), true)
   assert.equal(await page.getByRole('button', { name: '主题：原生风格', exact: true }).isVisible(), false)
   await openTab('换主题')
@@ -154,6 +167,7 @@ try {
   pass('Save-and-apply survives reload without overriding the host accent')
 
   await selectStyle('pixel')
+  await openMore()
   await page.getByRole('button', { name: '保存修改', exact: true }).click()
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'xp')
   await page.getByRole('button', { name: '保存并应用', exact: true }).click()
@@ -167,6 +181,7 @@ try {
   await page.getByRole('button', { name: '皮肤工坊', exact: true }).click()
   pass('Saving edits alone does not apply them; pixel styling changes geometry and supports host dark mode')
 
+  await openMore()
   await page.getByRole('button', { name: '另存为', exact: true }).click()
   assert.equal(await page.locator('.sw-saved .sw-card').count(), 2)
   assert.match(await page.getByLabel('皮肤名称', { exact: true }).inputValue(), /副本/)
@@ -243,9 +258,11 @@ try {
   pass('Changing theme preserves uploaded wallpaper, material, reading mask and name; editing alone is not application')
 
   if (artifacts) await page.screenshot({ animations: 'disabled', path: join(artifacts, 'workshop-material-dark.png') })
+  await openAdvanced()
   await page.getByLabel('面板不透明度', { exact: true }).press('Home')
   assert.equal(await page.getByLabel('正文阅读遮罩', { exact: true }).inputValue(), String(savedComposition.readingOpacity))
   await page.getByLabel('正文阅读遮罩', { exact: true }).press('End')
+  await openAdvanced()
   assert.equal(await page.getByLabel('面板不透明度', { exact: true }).inputValue(), '0')
   const material = (await readDraft()).skin
   assert.equal(material.opacity, 0)
@@ -264,12 +281,18 @@ try {
   assert.deepEqual([thick.opacity, thick.readingOpacity], [80, 80])
   assert.deepEqual(thick.wallpaper, savedComposition.wallpaper)
   await page.getByLabel('正文阅读遮罩', { exact: true }).press('End')
+  await openAdvanced()
   await page.getByLabel('面板不透明度', { exact: true }).press('Home')
+  await openAdvanced()
   assert.equal(await page.getByLabel('面板材质', { exact: true }).inputValue(), 'glass')
+  await openAdvanced()
   await page.getByLabel('面板材质', { exact: true }).selectOption('solid')
+  await openAdvanced()
   assert.equal(await page.getByLabel('面板不透明度', { exact: true }).isDisabled(), true)
+  await openAdvanced()
   assert.equal(await page.getByLabel('磨砂强度', { exact: true }).isDisabled(), true)
   assert.equal(await page.getByLabel('正文阅读遮罩', { exact: true }).isDisabled(), false)
+  await openAdvanced()
   await page.getByLabel('面板材质', { exact: true }).selectOption('glass')
   pass('Panel opacity, wallpaper opacity and reading mask are independent; solid material does not lock reading controls')
 
@@ -283,18 +306,24 @@ try {
   await page.getByRole('button', { name: '皮肤工坊', exact: true }).click()
   pass('Background-only native style keeps host composer geometry, palette and accent even after a live style change')
 
+  await openAdvanced()
   await page.getByLabel('壁纸不透明度', { exact: true }).press('Home')
   assert.equal(await page.locator('.sw-wallpaper__image').evaluate(el => getComputedStyle(el).opacity), '0')
+  await openAdvanced()
   assert.equal(await page.getByLabel('面板不透明度', { exact: true }).inputValue(), '0')
   assert.equal(await page.getByLabel('正文阅读遮罩', { exact: true }).inputValue(), '100')
   await openTab('换皮肤')
   await page.getByRole('button', { name: '移除背景', exact: true }).click()
+  await openAdvanced()
   assert.equal(await page.getByLabel('壁纸不透明度', { exact: true }).isDisabled(), true)
+  await openAdvanced()
   assert.equal(await page.getByLabel('图片填充', { exact: true }).isDisabled(), true)
   assert.equal(await page.locator('[data-recipe-theme]').innerText(), '原生风格')
   await page.getByRole('button', { name: '晴空草坡', exact: true }).click()
+  await openAdvanced()
   assert.equal(await page.getByLabel('壁纸不透明度', { exact: true }).inputValue(), '0')
   assert.equal(await page.locator('[data-recipe-theme]').innerText(), '原生风格')
+  await openAdvanced()
   await page.getByLabel('壁纸不透明度', { exact: true }).press('End')
   assert.equal(await page.locator('.sw-wallpaper__image').evaluate(el => getComputedStyle(el).opacity), '1')
   pass('Wallpaper opacity reaches the actual layer; removing or replacing background never resets the chosen theme or other opacity controls')
@@ -343,9 +372,20 @@ try {
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), previousLibrary)
   pass('A real browser timer automatically rolls back a 60-second preview without writing storage')
 
+  // Uploading answers immediately: the picked image is echoed with a success
+  // label instead of disappearing into a silent state.
+  await openTab('换皮肤')
+  const uploadImage = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 64; c.height = 48; const x = c.getContext('2d'); x.fillStyle = '#c85a2a'; x.fillRect(0, 0, 64, 48); return c.toDataURL('image/png').split(',')[1] })
+  await page.locator('input[aria-label="上传壁纸文件"]').setInputFiles({ name: 'echo.png', mimeType: 'image/png', buffer: Buffer.from(uploadImage, 'base64') })
+  await page.getByText('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。', { exact: true }).waitFor()
+  assert.equal(await page.locator('[data-bg-preview="image"]').count(), 1)
+  assert.equal((await page.locator('.sw-bgcard-copy strong').innerText()).trim(), '✓ 壁纸已上传')
+  assert.equal(await page.getByRole('button', { name: '换一张', exact: true }).isVisible(), true)
+  pass('Choosing a file echoes the image back with a success label and a 换一张 action')
+
   // Dropping a file on the highlighted zone must run the same local pipeline.
   const dropSkin = (await readDraft()).skin.wallpaper.image
-  await page.locator('.sw-dropzone').evaluate((el) => {
+  await page.locator('.sw-dropzone, .sw-bgcard').first().evaluate((el) => {
     const canvas = document.createElement('canvas'); canvas.width = 120; canvas.height = 80
     const ctx = canvas.getContext('2d'); ctx.fillStyle = '#3366cc'; ctx.fillRect(0, 0, 120, 80)
     const file = new File([new Blob([canvas.toDataURL('image/png').split(',')[1]], { type: 'text/plain' })], 'dragged.png', { type: 'image/png' })
@@ -360,8 +400,12 @@ try {
     return root && root.style.backgroundImage !== previous
   }, dropSkin, { timeout: 8000 }).catch(() => {})
   await page.getByText('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。', { exact: true }).waitFor()
+  // The picked image must be echoed back, not just accepted silently.
+  assert.equal(await page.locator('[data-bg-preview="image"]').count(), 1)
+  assert.match(await page.locator('[data-bg-preview="image"]').evaluate((el) => getComputedStyle(el).backgroundImage), /^url\("data:image\/webp;base64,/)
+  assert.equal((await page.locator('.sw-bgcard-copy strong').innerText()).trim(), '✓ 壁纸已上传')
   assert.match((await readDraft()).skin.wallpaper.image, /^data:image\/webp;base64,/)
-  pass('Dropping an image on the upload zone runs the same local compression as the file picker')
+  pass('Dropping an image echoes it back as a preview with a success label, and runs the same local compression')
 
   // Each theme ships a matching set (its own background + material). The small
   // button on the card loads the whole kit, not just the palette.
@@ -404,6 +448,7 @@ try {
   await page.getByRole('button', { name: '试穿 60 秒', exact: true }).click()
   await page.getByRole('button', { name: '保留并应用', exact: true }).click()
   assert.equal(await page.locator('body').getAttribute('data-sw-template'), 'pixel')
+  await openMore()
   await page.getByRole('button', { name: '删除', exact: true }).click()
   await page.getByRole('button', { name: '确认删除', exact: true }).click()
   assert.equal(await page.evaluate(() => document.body.hasAttribute('data-sw-skin')), false)
@@ -427,6 +472,7 @@ try {
   await page.reload()
   await page.getByText(/本机皮肤库无法读取/).waitFor()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY), '{broken')
+  await openMore()
   await page.getByRole('button', { name: '仅保存', exact: true }).click()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), RECOVERY_KEY), '{broken')
   pass('Corrupt preferences fail safely and are backed up before new saves')

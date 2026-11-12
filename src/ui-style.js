@@ -197,4 +197,20 @@ body[data-ds-dark-theme] .sw-livebar small{color:#ffacb3}
 .sw-page[data-motion="off"] *{animation:none!important;transition:none!important}
 .sw-page[data-motion="off"] .sw-card:hover,.sw-page[data-motion="off"] .sw-btn:active{transform:none}
 @keyframes sw-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* Background echo card: shows the picked image instead of a bare prompt. */
+.sw-bgcard{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:stretch;margin:2px 0 14px;padding:10px;border:1px solid var(--sw-ui-line);border-radius:14px;background:var(--sw-ui-card)}
+.sw-bgcard-thumb{min-height:88px;border-radius:10px;background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:inset 0 0 0 1px #00000012}
+.sw-bgcard-copy{display:flex;flex-direction:column;gap:4px;min-width:0;justify-content:center}
+.sw-bgcard-copy strong{font-size:13px;font-weight:650}
+.sw-bgcard-copy>span{font-size:11px;line-height:1.7;color:var(--sw-ui-muted)}
+.sw-bgcard-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sw-reading-control--top{margin-top:16px}
+.sw-advanced{margin-top:18px}
+.sw-more{flex:none;align-self:center}
+.sw-more>summary{margin-top:0}
+.sw-more-actions{margin-top:10px;gap:8px}
+.sw-savebar-primary{margin-left:auto}
+.sw-name-field{max-width:340px;margin:0}
+.sw-bgcard--active{border-color:var(--sw-ui-accent);background:color-mix(in srgb,var(--sw-ui-accent) 6%,var(--sw-ui-card))}
 `

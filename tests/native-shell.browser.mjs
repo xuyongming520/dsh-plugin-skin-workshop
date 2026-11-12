@@ -38,6 +38,7 @@ const browser = await chromium.launch({ headless: true })
 const artifacts = process.env.DSH_TEST_ARTIFACT_DIR
 if (artifacts) await mkdir(artifacts, { recursive: true })
 const openTab = async (name) => { await page.getByRole('tab', { name: new RegExp('^' + name) }).click() }
+const openAdvanced = async () => { const s = page.locator('.sw-advanced>summary'); if (await s.count() && !(await page.locator('.sw-advanced').evaluate((el) => el.open))) await s.click() }
 const failures = [], errors = [], external = [], observations = []
 let passed = 0, page
 const check = (label, okay, detail = '') => {
@@ -159,6 +160,7 @@ try {
   await page.locator('input[aria-label="上传壁纸文件"]').setInputFiles({name:'generated-test-wallpaper.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')})
   await page.getByText('壁纸已在本机压缩并嵌入皮肤。不会上传到外部服务。',{exact:true}).waitFor()
     await openTab('换皮肤')
+  await openAdvanced()
   await page.getByLabel('面板不透明度',{exact:true}).press('Home')
   for(let step=0;step<65;step++)await page.getByLabel('面板不透明度',{exact:true}).press('ArrowRight')
   await page.getByLabel('皮肤名称',{exact:true}).fill('原生界面回归 · 自制壁纸')
@@ -268,6 +270,7 @@ try {
   await page.evaluate(({key,value})=>localStorage.setItem(key,value),{key:STORAGE_KEY,value:oldLibrary})
   await page.reload();await page.getByRole('heading',{name:'皮肤工坊'}).waitFor()
   check('An actual persisted v1 library starts correctly and is not rewritten during adoption',await page.locator('body').getAttribute('data-sw-template')==='glass'&&await page.evaluate(key=>localStorage.getItem(key),STORAGE_KEY)===oldLibrary)
+  await openAdvanced()
   check('Adopted v1 library retains fractional panel/reading opacity without slider snapping',await page.getByLabel('面板不透明度',{exact:true}).inputValue()==='84.5'&&await page.getByLabel('正文阅读遮罩',{exact:true}).inputValue()==='84.5'&&await page.getByLabel('壁纸不透明度',{exact:true}).inputValue()==='100')
   await page.getByRole('button',{name:'保存并应用',exact:true}).click()
   const upgraded=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY)
