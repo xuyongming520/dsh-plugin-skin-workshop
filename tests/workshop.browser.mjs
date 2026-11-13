@@ -112,9 +112,10 @@ try {
   assert.equal(await page.getByRole('tab').count(), 3)
   assert.equal(await page.getByRole('tab', { name: /^换皮肤/ }).getAttribute('aria-selected'), 'true')
   assert.equal(await page.locator('.sw-tab-panel').count(), 3)
-  // First screen: the background (prompt or echo card) plus the reading mask.
-  assert.equal(await page.locator('[data-bg-preview]').count(), 1)
-  assert.equal(await page.locator('[data-bg-preview]').getAttribute('data-bg-preview'), 'preset')
+  // A brand-new install must open on the upload entry, not on a chosen background.
+  assert.equal(await page.locator('[data-bg-preview]').count(), 0)
+  assert.equal(await page.getByRole('button', { name: /上传一张壁纸/ }).isVisible(), true)
+  assert.equal(await page.getByLabel('正文阅读遮罩', { exact: true }).isVisible(), true)
   // No large mock window in the header: the real page is the preview. The only
   // miniatures left are the small swatches on the skin cards.
   assert.equal(await page.locator('.sw-top .sw-mini').count(), 0)

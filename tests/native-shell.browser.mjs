@@ -220,6 +220,11 @@ try {
   await page.waitForFunction(()=>document.querySelector('[data-natural]').hasAttribute('data-scrolled'))
   const scrolled=await page.locator('[data-natural]').evaluate(el=>({fill:getComputedStyle(el,'::before').backgroundColor,blur:getComputedStyle(el,'::before').backdropFilter}))
   check('Scrolled sticky header has its own glass backing to prevent overlapping labels',scrolled.fill!=='rgba(0, 0, 0, 0)'&&scrolled.blur!=='none',JSON.stringify(scrolled))
+  // It must stay translucent: an opaque bar reads as a white block over the wallpaper.
+  const stickyAlpha=Number((scrolled.fill.match(/\/\s*([\d.]+)\s*\)/)||[])[1] ?? 1)
+  // The old build floored this at 95% regardless of the reading mask, which read
+  // as a solid white bar. It now follows the skin, so it must stay below that.
+  check('Scrolled sticky header follows the skin instead of a fixed near-opaque bar',stickyAlpha<0.95,JSON.stringify({fill:scrolled.fill,alpha:stickyAlpha}))
   if(artifacts)await page.screenshot({animations:'disabled',path:join(artifacts,'native-plugins-scrolled.png')})
 
   await page.getByRole('button',{name:'原生示例聊天',exact:true}).click()

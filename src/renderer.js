@@ -27,7 +27,9 @@ export function skinVariables(input, dark = false, preview = false) {
     '--sw-pane': pane,
     // Reading protection is independent of both wallpaper and floating panels.
     '--sw-reading-pane': `color-mix(in srgb, ${solid} ${s.readingOpacity}%, transparent)`,
-    '--sw-sticky-pane': `color-mix(in srgb, ${solid} ${Math.max(95, s.readingOpacity, opacity)}%, transparent)`,
+    // A scrolled sticky header shares the page's reading backing (slightly
+    // stronger so labels stay legible), instead of turning into a white bar.
+    '--sw-sticky-pane': `color-mix(in srgb, ${solid} ${Math.min(100, Math.max(40, s.readingOpacity + 10))}%, transparent)`,
     '--sw-ink': ink,
     '--sw-muted': muted,
     '--sw-line': native ? host('--dsw-alias-border-l2', dark ? 'rgba(255,255,255,.23)' : 'rgba(41,53,68,.22)') : dark ? 'rgba(255,255,255,.23)' : (pixel ? '#51564a' : 'rgba(41,53,68,.22)'),

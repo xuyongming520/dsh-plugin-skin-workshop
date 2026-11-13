@@ -73,6 +73,15 @@ export function makeCombination(id = 'wallpaper') {
   return skin
 }
 
+// A brand-new user starts with an empty background so the upload entry is the
+// first thing they can act on, not a preset someone else chose.
+export function makeStarter() {
+  const skin = makeCombination()
+  skin.name = '我的皮肤'
+  skin.wallpaper = { ...skin.wallpaper, kind: 'none', image: '' }
+  return skin
+}
+
 // A theme change affects only its color/shape recipe. It must not replace the
 // user's wallpaper, material, reading protection, name or animation preference.
 export function changeTemplate(input, template) {

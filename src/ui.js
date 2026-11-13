@@ -1,4 +1,4 @@
-import { TEMPLATE_INFO, BACKGROUND_INFO, COMBINATION_INFO, makeCombination, changeTemplate, cloneSkin, sameSkin, validateSkin, PREVIEW_SECONDS } from './model.js'
+import { TEMPLATE_INFO, BACKGROUND_INFO, COMBINATION_INFO, makeCombination, makeStarter, changeTemplate, cloneSkin, sameSkin, validateSkin, PREVIEW_SECONDS } from './model.js'
 import { PRESET_BACKGROUNDS } from './backgrounds.js'
 import { skinVariables } from './renderer.js'
 import { readWallpaperFile, readSkinFile, downloadSkin } from './files.js'
@@ -67,8 +67,8 @@ export function createWorkshopUI(React, store, openWorkbench) {
     const state = useWorkshop()
     const dark = useHostDark()
     const initial = React.useRef(draftMemory ?? {
-      draft: cloneSkin(state.active?.skin ?? makeCombination()),
-      baseline: cloneSkin(state.active?.skin ?? makeCombination()),
+      draft: cloneSkin(state.active?.skin ?? makeStarter()),
+      baseline: cloneSkin(state.active?.skin ?? makeStarter()),
       selectedId: state.active?.id ?? null,
       editorTab: 'skin',
     }).current
@@ -217,8 +217,8 @@ export function createWorkshopUI(React, store, openWorkbench) {
         setBaseline(cloneSkin(undoSnapshot.skin))
       } else {
         store.restoreDefault()
-        setDraft(makeCombination())
-        setBaseline(makeCombination())
+        setDraft(makeStarter())
+        setBaseline(makeStarter())
       }
       setUndoSnapshot(null)
       setMessage('已撤销这次更换。')
@@ -226,7 +226,7 @@ export function createWorkshopUI(React, store, openWorkbench) {
     const remove = () => setConfirm({
       text: state.active?.id === selectedId ? '删除这款皮肤后会恢复 DSH 默认外观。要继续吗？' : '要从本机删除这款皮肤吗？建议先导出备份。',
       label: '确认删除',
-      action: () => run(() => { store.remove(selectedId); replaceDraft(makeCombination(), null, '已删除。') }),
+      action: () => run(() => { store.remove(selectedId); replaceDraft(makeStarter(), null, '已删除。') }),
     })
     async function importFile(file) {
       if (!file) return

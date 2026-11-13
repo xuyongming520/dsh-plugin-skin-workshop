@@ -79,6 +79,15 @@ function makeCombination(id = 'wallpaper') {
   return skin
 }
 
+// A brand-new user starts with an empty background so the upload entry is the
+// first thing they can act on, not a preset someone else chose.
+function makeStarter() {
+  const skin = makeCombination()
+  skin.name = '我的皮肤'
+  skin.wallpaper = { ...skin.wallpaper, kind: 'none', image: '' }
+  return skin
+}
+
 // A theme change affects only its color/shape recipe. It must not replace the
 // user's wallpaper, material, reading protection, name or animation preference.
 function changeTemplate(input, template) {
@@ -238,7 +247,9 @@ function skinVariables(input, dark = false, preview = false) {
     '--sw-pane': pane,
     // Reading protection is independent of both wallpaper and floating panels.
     '--sw-reading-pane': `color-mix(in srgb, ${solid} ${s.readingOpacity}%, transparent)`,
-    '--sw-sticky-pane': `color-mix(in srgb, ${solid} ${Math.max(95, s.readingOpacity, opacity)}%, transparent)`,
+    // A scrolled sticky header shares the page's reading backing (slightly
+    // stronger so labels stay legible), instead of turning into a white bar.
+    '--sw-sticky-pane': `color-mix(in srgb, ${solid} ${Math.min(100, Math.max(40, s.readingOpacity + 10))}%, transparent)`,
     '--sw-ink': ink,
     '--sw-muted': muted,
     '--sw-line': native ? host('--dsw-alias-border-l2', dark ? 'rgba(255,255,255,.23)' : 'rgba(41,53,68,.22)') : dark ? 'rgba(255,255,255,.23)' : (pixel ? '#51564a' : 'rgba(41,53,68,.22)'),
@@ -959,8 +970,8 @@ function createWorkshopUI(React, store, openWorkbench) {
     const state = useWorkshop()
     const dark = useHostDark()
     const initial = React.useRef(draftMemory ?? {
-      draft: cloneSkin(state.active?.skin ?? makeCombination()),
-      baseline: cloneSkin(state.active?.skin ?? makeCombination()),
+      draft: cloneSkin(state.active?.skin ?? makeStarter()),
+      baseline: cloneSkin(state.active?.skin ?? makeStarter()),
       selectedId: state.active?.id ?? null,
       editorTab: 'skin',
     }).current
@@ -1109,8 +1120,8 @@ function createWorkshopUI(React, store, openWorkbench) {
         setBaseline(cloneSkin(undoSnapshot.skin))
       } else {
         store.restoreDefault()
-        setDraft(makeCombination())
-        setBaseline(makeCombination())
+        setDraft(makeStarter())
+        setBaseline(makeStarter())
       }
       setUndoSnapshot(null)
       setMessage('已撤销这次更换。')
@@ -1118,7 +1129,7 @@ function createWorkshopUI(React, store, openWorkbench) {
     const remove = () => setConfirm({
       text: state.active?.id === selectedId ? '删除这款皮肤后会恢复 DSH 默认外观。要继续吗？' : '要从本机删除这款皮肤吗？建议先导出备份。',
       label: '确认删除',
-      action: () => run(() => { store.remove(selectedId); replaceDraft(makeCombination(), null, '已删除。') }),
+      action: () => run(() => { store.remove(selectedId); replaceDraft(makeStarter(), null, '已删除。') }),
     })
     async function importFile(file) {
       if (!file) return
