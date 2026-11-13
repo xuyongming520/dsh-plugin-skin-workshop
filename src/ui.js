@@ -430,12 +430,6 @@ export function createWorkshopUI(React, store, openWorkbench) {
         message ? h('div', { className: 'sw-notice', role: 'status' },
           h('span', null, message),
           undoSnapshot ? h(Button, { tone: 'ghost', onClick: undoApplied }, '撤销') : null) : null,
-        h('div', { className: 'sw-recipe', 'aria-label': '当前搭配' },
-          h('span', null, h('small', null, '主题'), h('strong', { 'data-recipe-theme': true }, TEMPLATE_INFO[draft.template].title)),
-          h('i', { 'aria-hidden': true }, '＋'),
-          h('span', null, h('small', null, '背景'), h('strong', { 'data-recipe-background': true }, backgroundLabel)),
-          h('i', { 'aria-hidden': true }, '＋'),
-          h('span', null, h('small', null, '材质'), h('strong', { 'data-recipe-material': true }, draft.material === 'solid' ? '不透明面板' : `磨砂玻璃 · ${draft.opacity}%`))),
         h('label', { className: 'sw-toggle', style: { marginTop: 12 } }, h('input', { type: 'checkbox', checked: draft.motion, onChange: (event) => editMeta({ motion: event.target.checked }) }), '工坊入场与悬停动效（尊重系统减少动态效果设置）'),
         h('p', { className: 'sw-note' }, '换皮肤管背景与材质，换主题管配色与控件形状，两块自由组合后整套保存。覆盖原生侧栏、标题与聊天等主要区域；第三方页面和内嵌网站不保证整套覆盖。复古、像素为风格化实现。')))
   }
