@@ -1,6 +1,6 @@
 {
   "name": "@local/violet-skin",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
@@ -21,10 +21,18 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.2-rc.1 <0.3.0-0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-theme": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-theme": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-layout": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-slots": {
+      "optional": true
+    }
   },
   "exports": {
     ".": "./index.js",
@@ -33,11 +41,22 @@
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js", "client.js", "cordis.patch.yml", "README.md",
-    "src", "scripts", "tests", "examples", "locale/*.json", "icon.svg"
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "src",
+    "scripts",
+    "tests",
+    "examples",
+    "locale/*.json",
+    "icon.svg"
   ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
